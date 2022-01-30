@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from KNN import KNN
+
 def hepatitis_data():
     hep_names = ["Class", "Age", "Sex", "Steroid", "Antivirals", "Fatigue", "Malaise", "Anorexia",
                  "Liver_Big", "Liver_Firm", "Spleen_Palpable", "Spiders", "Ascites", "Varices",
@@ -20,18 +22,42 @@ def hepatitis_data():
     print("\n Number of rows/data points in the dataset after dropping: ", num_rows)
 
     # count of each Class type (Die = 1 and Live = 2)
-    group = hep_df.groupby('Class')
-    group.size().plot.bar()
-    plt.show()
+    # group = hep_df.groupby('Class')
+    # group.size().plot.bar()
+    # plt.show()
 
     # distribution of Age versus Class
-    hep_df.boxplot(column='Age', by='Class')
-    plt.show()
+    # hep_df.boxplot(column='Age', by='Class')
+    # plt.show()
 
     # count of yes/no features based on class, could make some plot with these
     # Steroid_count = hep_df.groupby(['Class', 'Steroid']).size().reset_index(name='countSteroid')
-
     # plt.show()
+
+    # randomize the data
+    random_data = hep_df.sample(frac=1)
+
+    # predicting Class (Live or Die) based on Age (for testing)
+    x, y = random_data[['Age']], random_data[['Class']]
+
+    # create train and test data for predicting class based on Age
+    (N, D), C = x.shape, y['Class'].max()
+    print("instances (N) \t ", N, "\n features (D) \t ", D, "\n classes (C) \t ", C)
+
+    # split the dataset into 70 training points and 10 test points
+    # reset the indices for convenience, might get rid of it for comparing with original data
+    x_train, y_train = x[:70].reset_index(drop=True), y[:70].reset_index(drop=True)
+    x_test, y_test = x[70:].reset_index(drop=True), y[70:].reset_index(drop=True)
+
+    # try KNN=5
+    model = KNN(K=5)
+    model.fit(x_train, y_train)
+    y_prob, knns = model.predict(x_test)
+    print(x_test)
+    print('knns shape:', knns.shape)
+    print('y_prob shape:', y_prob.shape)
+    print(knns)
+    print(y_prob)
 
 def messidor_data():
     # Not sure about the columns names? The descriptions were not helpful
