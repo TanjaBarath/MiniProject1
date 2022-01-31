@@ -19,16 +19,21 @@ def hepatitis_data():
     # useful statistics
     # total number of rows after dropping
     num_rows = hep_df.shape[0]
-    print("\n Number of rows/data points in the dataset after dropping: ", num_rows)
+    print("\n Number of rows/data points in the dataset after dropping: ", num_rows, "\n")
 
     # count of each Class type (Die = 1 and Live = 2)
-    # group = hep_df.groupby('Class')
-    # group.size().plot.bar()
-    # plt.show()
+    group = hep_df.groupby('Class')
+    group.size().plot.bar()
+    plt.ylabel('Count')
+    plt.show()
 
     # distribution of Age versus Class
-    # hep_df.boxplot(column='Age', by='Class')
-    # plt.show()
+    hep_df.boxplot(column='Age', by='Class')
+    plt.title('Distribution of Age for every Class')
+    plt.suptitle('')
+    plt.ylabel('Age')
+    plt.xlabel('Class')
+    plt.show()
 
     # count of yes/no features based on class, could make some plot with these
     # Steroid_count = hep_df.groupby(['Class', 'Steroid']).size().reset_index(name='countSteroid')
@@ -45,19 +50,22 @@ def hepatitis_data():
     print("instances (N) \t ", N, "\n features (D) \t ", D, "\n classes (C) \t ", C)
 
     # split the dataset into 70 training points and 10 test points
-    # reset the indices for convenience, might get rid of it for comparing with original data
-    x_train, y_train = x[:70].reset_index(drop=True), y[:70].reset_index(drop=True)
-    x_test, y_test = x[70:].reset_index(drop=True), y[70:].reset_index(drop=True)
+    x_train, y_train = x[:70], y[:70]
+    x_test, y_test = x[70:], y[70:]
 
     # try KNN=5
     model = KNN(K=5)
     model.fit(x_train, y_train)
     y_prob, knns = model.predict(x_test)
-    print(x_test)
     print('knns shape:', knns.shape)
     print('y_prob shape:', y_prob.shape)
-    print(knns)
-    print(y_prob)
+
+    # choose class that has the max probability
+    # adding one since Class has 1 and 2 as values
+    y_pred = np.argmax(y_prob, axis=-1) + 1
+    # y_test is a dataframe, convert it to a numpy array and calculate accuracy
+    acc = model.evaluate_acc(y_pred, y_test['Class'].to_numpy())
+    print(acc)
 
 def messidor_data():
     # Not sure about the columns names? The descriptions were not helpful

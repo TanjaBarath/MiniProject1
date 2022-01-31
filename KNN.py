@@ -27,7 +27,7 @@ class KNN:
         # how many test data points are we predicting
         num_test = x_test.shape[0]
         # get the distance between our trained data and test data
-        # gp through every test point and calculate distance with every training point
+        # go through every test point and calculate distance with every training point
         distances = []
         for k in range(x_test.shape[0]):
             temp_dist = []
@@ -39,17 +39,17 @@ class KNN:
         knns = np.zeros((num_test, self.K), dtype=int)
         # ith-row of y_prob has the probability distribution over C classes
         y_prob = np.zeros((num_test, self.C))
-        # sort the neighbors to get the K nearest and get the number of instances of each class
+        # sort the neighbors to get the K nearest and get the prob of each class based on neighbours
         for i in range(num_test):
             knns[i, :] = np.argsort(distances[i])[:self.K]
             temp = np.bincount(self.y.iloc[knns[i, :]]['Class'].to_numpy(), minlength=self.C)
             # bin count gets count from 0 to 2, eliminate the 0 count since it's not a class
-            # maybe consider changing class to 0 and 1 rather than 1 and 2?
             y_prob[i, :] = [temp[1], temp[2]]
         # divide by K to get a probability distribution
         y_prob /= self.K
         return y_prob, knns
 
     def evaluate_acc(self, y_pred, y_test):
+        # accuracy equation
         accuracy = np.sum(y_pred == y_test) / y_test.shape[0]
         return accuracy
