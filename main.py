@@ -13,38 +13,37 @@ def hepatitis_data():
     # eliminating rows with ? values in the dataframe
     hep_df.drop(hep_df.index[hep_df.eq('?').any(1)], inplace=True)
 
-    # first 5 rows of the data and description
-    print(hep_df.head().to_string())
-    print(hep_df.describe(include='all').to_string())
     # notice the ? made some columns non-numeric
     hep_df = hep_df.apply(pd.to_numeric, errors='ignore')
-    print(hep_df.describe(include='all').to_string())
+
+    return hep_df
+
+def hep_stats(dataset):
+    # first 5 rows of the data and description
+    print(dataset.head().to_string(), "\n")
+    print(dataset.describe(include='all').to_string())
 
     # useful statistics
     # total number of rows after dropping
-    num_rows = hep_df.shape[0]
-    print("\n Number of rows/data points in the dataset after dropping: ", num_rows, "\n")
+    num_rows = dataset.shape[0]
+    print("\nNumber of rows/data points in the dataset after dropping: ", num_rows)
 
-    # count of each Class type (Die = 1 and Live = 2)
-    group = hep_df.groupby('Class')
-    group.size().plot.bar()
-    plt.title('Count of each Class')
-    plt.xlabel('')
-    plt.ylabel('Count')
-    plt.xticks(np.arange(2), ['Die', 'Live'])
-    plt.show()
+    # number of people that have died and lived
+    group = dataset.groupby('Class')
+    print("The number of people in the dataset that have died: ", group.size()[1])
+    print("The number of people in the dataset that have lived: ", group.size()[2], "\n")
 
     # distribution of Age versus Class
-    hep_df.boxplot(column='Age', by='Class')
+    dataset.boxplot(column='Age', by='Class')
     plt.title('Distribution of Age for every Class')
     plt.suptitle('')
     plt.ylabel('Age')
     plt.xlabel('')
     plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
-    plt.show()
+    # plt.show()
 
     # Male and Female counts for each Class
-    sex_dist = hep_df.groupby(['Class', 'Sex']).size().unstack(fill_value=0).stack().reset_index(name='count')
+    sex_dist = dataset.groupby(['Class', 'Sex']).size().unstack(fill_value=0).stack().reset_index(name='count')
     x = np.arange(2)
     width = 0.2
     plt.bar(x-0.1, sex_dist.loc[sex_dist['Sex']==1]['count'].to_numpy(), width, color='cyan')
@@ -52,21 +51,21 @@ def hepatitis_data():
     plt.title('Count of Sex for each Class')
     plt.xticks(x, ['Die', 'Live'])
     plt.legend(['Male', 'Female'])
-    plt.show()
+    # plt.show()
 
     # count of yes/no features based on class
-    Steroid = hep_df.groupby(['Class', 'Steroid']).size().reset_index(name='count')
-    Antivirals = hep_df.groupby(['Class', 'Antivirals']).size().reset_index(name='count')
-    Fatigue = hep_df.groupby(['Class', 'Fatigue']).size().reset_index(name='count')
-    Malaise = hep_df.groupby(['Class', 'Malaise']).size().reset_index(name='count')
-    Anorexia = hep_df.groupby(['Class', 'Anorexia']).size().unstack(fill_value=0).stack().reset_index(name='count')
-    LiverBig = hep_df.groupby(['Class', 'Liver_Big']).size().unstack(fill_value=0).stack().reset_index(name='count')
-    LiverFirm = hep_df.groupby(['Class', 'Liver_Firm']).size().reset_index(name='count')
-    SpleenPalpable = hep_df.groupby(['Class', 'Spleen_Palpable']).size().reset_index(name='count')
-    Spiders = hep_df.groupby(['Class', 'Spiders']).size().reset_index(name='count')
-    Ascites = hep_df.groupby(['Class', 'Ascites']).size().reset_index(name='count')
-    Varices = hep_df.groupby(['Class', 'Varices']).size().reset_index(name='count')
-    Histology = hep_df.groupby(['Class', 'Histology']).size().reset_index(name='count')
+    Steroid = dataset.groupby(['Class', 'Steroid']).size().reset_index(name='count')
+    Antivirals = dataset.groupby(['Class', 'Antivirals']).size().reset_index(name='count')
+    Fatigue = dataset.groupby(['Class', 'Fatigue']).size().reset_index(name='count')
+    Malaise = dataset.groupby(['Class', 'Malaise']).size().reset_index(name='count')
+    Anorexia = dataset.groupby(['Class', 'Anorexia']).size().unstack(fill_value=0).stack().reset_index(name='count')
+    LiverBig = dataset.groupby(['Class', 'Liver_Big']).size().unstack(fill_value=0).stack().reset_index(name='count')
+    LiverFirm = dataset.groupby(['Class', 'Liver_Firm']).size().reset_index(name='count')
+    SpleenPalpable = dataset.groupby(['Class', 'Spleen_Palpable']).size().reset_index(name='count')
+    Spiders = dataset.groupby(['Class', 'Spiders']).size().reset_index(name='count')
+    Ascites = dataset.groupby(['Class', 'Ascites']).size().reset_index(name='count')
+    Varices = dataset.groupby(['Class', 'Varices']).size().reset_index(name='count')
+    Histology = dataset.groupby(['Class', 'Histology']).size().reset_index(name='count')
 
     # add all the above into a table with Class, Answer and Feature Counts
     count_dist = pd.DataFrame({'Class': [1, 1, 2, 2], 'Answer': [1, 2, 1, 2], 'Steroid': Steroid['count'],
@@ -87,7 +86,7 @@ def hepatitis_data():
                                'Spleen_Palpable', 'Spiders', 'Ascites', 'Varices', 'Histology'], rotation=90)
     plt.ylabel('Count')
     plt.legend(['No', 'Yes'])
-    plt.show()
+    # plt.show()
 
     # second graph has people ho have lived (Class == 2)
     plt.bar(x-0.1, count_dist.loc[(count_dist['Class'] == 2) & (count_dist['Answer'] == 1)].to_numpy().flatten()[2:],
@@ -99,81 +98,53 @@ def hepatitis_data():
                    'Spleen_Palpable', 'Spiders', 'Ascites', 'Varices', 'Histology'], rotation=90)
     plt.ylabel('Count')
     plt.legend(['No', 'Yes'])
-    plt.show()
+    # plt.show()
 
     # boxplots of the rest of the features vs Class
     # Bilirubin
-    hep_df.boxplot(column='Bilirubin', by='Class')
+    dataset.boxplot(column='Bilirubin', by='Class')
     plt.title('Distribution of Bilirubin for every Class')
     plt.suptitle('')
     plt.ylabel('Bilirubin')
     plt.xlabel('')
     plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
-    plt.show()
+    # plt.show()
 
     # Alk Phosphate
-    hep_df.boxplot(column='Alk_Phosphate', by='Class')
+    dataset.boxplot(column='Alk_Phosphate', by='Class')
     plt.title('Distribution of Alk Phosphate for every Class')
     plt.suptitle('')
     plt.ylabel('Alk Phosphate')
     plt.xlabel('')
     plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
-    plt.show()
+    # plt.show()
 
     # Sgot
-    hep_df.boxplot(column='Sgot', by='Class')
+    dataset.boxplot(column='Sgot', by='Class')
     plt.title('Distribution of Sgot for every Class')
     plt.suptitle('')
     plt.ylabel('Sgot')
     plt.xlabel('')
     plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
-    plt.show()
+    # plt.show()
 
     # Albumin
-    hep_df.boxplot(column='Albumin', by='Class')
+    dataset.boxplot(column='Albumin', by='Class')
     plt.title('Distribution of Albumin for every Class')
     plt.suptitle('')
     plt.ylabel('Albumin')
     plt.xlabel('')
     plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
-    plt.show()
+    # plt.show()
 
     # Protime
-    hep_df.boxplot(column='Protime', by='Class')
+    dataset.boxplot(column='Protime', by='Class')
     plt.title('Distribution of Protime for every Class')
     plt.suptitle('')
     plt.ylabel('Protime')
     plt.xlabel('')
     plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
-    plt.show()
-
-    # randomize the data
-    random_data = hep_df.sample(frac=1)
-
-    # predicting Class (Live or Die) based on Age (for testing)
-    x, y = random_data[['Age']], random_data[['Class']]
-
-    # create train and test data for predicting class based on Age
-    (N, D), C = x.shape, y['Class'].max()
-    print("instances (N) \t ", N, "\n features (D) \t ", D, "\n classes (C) \t ", C)
-
-    # split the dataset into 70 training points and 10 test points
-    x_train, y_train = x[:70], y[:70]
-    x_test, y_test = x[70:], y[70:]
-
-    # try KNN=5
-    model = KNN(K=5)
-    model.fit(x_train, y_train)
-    y_prob, knns = model.predict(x_test)
-    print('knns shape:', knns.shape)
-    print('y_prob shape:', y_prob.shape)
-
-    # choose class that has the max probability
-    # adding one since Class has 1 and 2 as values
-    y_pred = np.argmax(y_prob, axis=-1) + 1
-    # y_test is a dataframe, convert it to a numpy array and calculate accuracy
-    acc = model.evaluate_acc(y_pred, y_test['Class'].to_numpy())
-    print(acc)
+    # plt.show()
 
 def messidor_data():
     # Not sure about the columns names? The descriptions were not helpful
@@ -190,9 +161,56 @@ def messidor_data():
 
     # might need more cleaning up based on data values
 
+def KNN_alg(dataset, features, K):
+    # randomize the data
+    random_data = dataset.sample(frac=1)
+
+    # predicting Class (Live or Die) based on important features
+    x, y = random_data[features], random_data[['Class']]
+
+    # create train and test data for predicting class based on Age
+    (N, D), C = x.shape, y['Class'].max()
+    print("instances (N) \t ", N, "\n features (D) \t ", D, "\n classes (C) \t ", C)
+
+    # implementing L-fold cross-validation and getting all errors
+    errors = []
+    # splitting the dataset manually into 4 chunks of 20
+    train_fold, test_fold = [x[:20], x[20:40], x[40:60], x[60:]], [y[:20], y[20:40], y[40:60], y[60:]]
+    # the folds are created, iterate through and change test set
+    for i in range(4):
+        # need to concat the 3 training chunks for x (feature values) and y (class)
+        x_chunk = []
+        y_chunk = []
+        x_chunk.append(train_fold[:i] + train_fold[(i+1):])
+        y_chunk.append(test_fold[:i] + test_fold[(i + 1):])
+
+        # choose training and test sets
+        x_train, y_train = pd.concat(x_chunk[0]), pd.concat(y_chunk[0])
+        x_test, y_test = train_fold[i], test_fold[i]
+
+        # fitting the model
+        model = KNN(K=K)
+        model.fit(x_train, y_train)
+        y_prob, knns = model.predict(x_test)
+
+        # choose class that has the max probability
+        # adding one since Class has 1 and 2 as values
+        y_pred = np.argmax(y_prob, axis=-1) + 1
+        # y_test is a dataframe, convert it to a numpy array and calculate accuracy
+        acc = model.evaluate_acc(y_pred, y_test['Class'].to_numpy())
+        errors.append(acc)
+
+    print("\nKNN for K = ", K, " on Hepatitis dataset")
+    print("Errors from cross validation: ", errors)
+    print("Mean of errors: ", np.mean(errors))
+    print("Variance of errors: ", np.var(errors), "\n")
+
 def main():
     np.random.seed(123456)
-    hepatitis_data()
+    data = hepatitis_data()
+    features = ['Bilirubin', 'Albumin', 'Protime']
+    for K in range(5, 21, 5):
+        KNN_alg(data, features, K)
 
 if __name__ == "__main__":
     main()
