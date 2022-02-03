@@ -20,7 +20,7 @@ class KNN:
         self.x = x
         self.y = y
         # each dataset has a 2-valued class
-        self.C = 2
+        self.C = y['Class'].max()+1
 
     # predict the Class of some test data
     def predict(self, x_test):
@@ -42,9 +42,7 @@ class KNN:
         # sort the neighbors to get the K nearest and get the prob of each class based on neighbours
         for i in range(num_test):
             knns[i, :] = np.argsort(distances[i])[:self.K]
-            temp = np.bincount(self.y.iloc[knns[i, :]]['Class'].to_numpy(), minlength=self.C)
-            # bin count gets count from 0 to 2, eliminate the 0 count since it's not a class
-            y_prob[i, :] = [temp[1], temp[2]]
+            y_prob[i, :] = np.bincount(self.y.iloc[knns[i, :]]['Class'].to_numpy(), minlength=self.C)
         # divide by K to get a probability distribution
         y_prob /= self.K
         return y_prob, knns

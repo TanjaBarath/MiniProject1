@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import random
 
 from KNN import KNN
 
@@ -15,6 +16,9 @@ def hepatitis_data():
 
     # notice the ? made some columns non-numeric
     hep_df = hep_df.apply(pd.to_numeric, errors='ignore')
+
+    # hepatitis data has Class 1 and 2, change this to 0 and 1
+    hep_df.loc[:, 'Class'] = hep_df['Class'].apply(lambda x: x-1)
 
     return hep_df
 
@@ -68,18 +72,18 @@ def hep_stats(dataset):
     Histology = dataset.groupby(['Class', 'Histology']).size().reset_index(name='count')
 
     # add all the above into a table with Class, Answer and Feature Counts
-    count_dist = pd.DataFrame({'Class': [1, 1, 2, 2], 'Answer': [1, 2, 1, 2], 'Steroid': Steroid['count'],
+    count_dist = pd.DataFrame({'Class': [0, 0, 1, 1], 'Answer': [1, 2, 1, 2], 'Steroid': Steroid['count'],
                                'Antivirals': Antivirals['count'], 'Fatigue': Fatigue['count'], 'Malaise': Malaise['count'],
                                'Anorexia': Anorexia['count'], 'Liver_Big': LiverBig['count'], 'Liver_Firm': LiverFirm['count'],
                                'Spleen_Palpable': SpleenPalpable['count'], 'Spiders': Spiders['count'], 'Ascites': Ascites['count'],
                                'Varices': Varices['count'], 'Histology': Histology['count']})
 
-    # making two plots for yes/no features, first one only has people who died (Class == 1)
+    # making two plots for yes/no features, first one only has people who died (Class == 0)
     x = np.arange(12)
     width = 0.2
-    plt.bar(x-0.1, count_dist.loc[(count_dist['Class'] == 1) & (count_dist['Answer'] == 1)].to_numpy().flatten()[2:],
+    plt.bar(x-0.1, count_dist.loc[(count_dist['Class'] == 0) & (count_dist['Answer'] == 1)].to_numpy().flatten()[2:],
             width, color='cyan')
-    plt.bar(x+0.1, count_dist.loc[(count_dist['Class'] == 1) & (count_dist['Answer'] == 2)].to_numpy().flatten()[2:],
+    plt.bar(x+0.1, count_dist.loc[(count_dist['Class'] == 0) & (count_dist['Answer'] == 2)].to_numpy().flatten()[2:],
             width, color='green')
     plt.title('Count of Yes/No Answer for Different Features in Class Die')
     plt.xticks(x, ['Steroid', 'Antivirals', 'Fatigue', 'Malaise', 'Anorexia', 'Liver_Big', 'Liver_Firm',
@@ -88,10 +92,10 @@ def hep_stats(dataset):
     plt.legend(['No', 'Yes'])
     # plt.show()
 
-    # second graph has people ho have lived (Class == 2)
-    plt.bar(x-0.1, count_dist.loc[(count_dist['Class'] == 2) & (count_dist['Answer'] == 1)].to_numpy().flatten()[2:],
+    # second graph has people ho have lived (Class == 1)
+    plt.bar(x-0.1, count_dist.loc[(count_dist['Class'] == 1) & (count_dist['Answer'] == 1)].to_numpy().flatten()[2:],
             width, color='cyan')
-    plt.bar(x+0.1, count_dist.loc[(count_dist['Class'] == 2) & (count_dist['Answer'] == 2)].to_numpy().flatten()[2:],
+    plt.bar(x+0.1, count_dist.loc[(count_dist['Class'] == 1) & (count_dist['Answer'] == 2)].to_numpy().flatten()[2:],
             width, color='green')
     plt.title('Count of Yes/No Answer for Different Features in Class Live')
     plt.xticks(x, ['Steroid', 'Antivirals', 'Fatigue', 'Malaise', 'Anorexia', 'Liver_Big', 'Liver_Firm',
@@ -146,6 +150,8 @@ def hep_stats(dataset):
     plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
     # plt.show()
 
+    print(dataset[dataset.columns].corr()['Class'][:].sort_values())
+
 def messidor_data():
     # Not sure about the columns names? The descriptions were not helpful
     messidor_names = ["Quality", "Pre-Screening", "MA_Detection_0.5", "MA_Detection_0.6", "MA_Detection_0.7",
@@ -161,7 +167,7 @@ def messidor_data():
 
     # might need more cleaning up based on data values
 
-def KNN_alg(dataset, features, K):
+def KNN_alg(dataset, features, K, L_fold):
     # randomize the data
     random_data = dataset.sample(frac=1)
 
@@ -174,15 +180,18 @@ def KNN_alg(dataset, features, K):
 
     # implementing L-fold cross-validation and getting all errors
     errors = []
-    # splitting the dataset manually into 4 chunks of 20
-    train_fold, test_fold = [x[:20], x[20:40], x[40:60], x[60:]], [y[:20], y[20:40], y[40:60], y[60:]]
+    # splitting the dataset into L chunks
+    fold_size = int(dataset.shape[0]/L_fold)
+    train_fold, test_fold = [], []
+    for i in range(0, dataset.shape[0], fold_size):
+        train_fold.append(x[i:(i+fold_size)])
+        test_fold.append(y[i:(i+fold_size)])
     # the folds are created, iterate through and change test set
-    for i in range(4):
-        # need to concat the 3 training chunks for x (feature values) and y (class)
-        x_chunk = []
-        y_chunk = []
+    for i in range(L_fold):
+        # need to concat the L-1 training chunks for x (feature values) and y (class)
+        x_chunk, y_chunk = [], []
         x_chunk.append(train_fold[:i] + train_fold[(i+1):])
-        y_chunk.append(test_fold[:i] + test_fold[(i + 1):])
+        y_chunk.append(test_fold[:i] + test_fold[(i+1):])
 
         # choose training and test sets
         x_train, y_train = pd.concat(x_chunk[0]), pd.concat(y_chunk[0])
@@ -195,12 +204,12 @@ def KNN_alg(dataset, features, K):
 
         # choose class that has the max probability
         # adding one since Class has 1 and 2 as values
-        y_pred = np.argmax(y_prob, axis=-1) + 1
+        y_pred = np.argmax(y_prob, axis=-1)
         # y_test is a dataframe, convert it to a numpy array and calculate accuracy
         acc = model.evaluate_acc(y_pred, y_test['Class'].to_numpy())
         errors.append(acc)
 
-    print("\nKNN for K = ", K, " on Hepatitis dataset")
+    print("\nKNN for K = ", K, " on given dataset")
     print("Errors from cross validation: ", errors)
     print("Mean of errors: ", np.mean(errors))
     print("Variance of errors: ", np.var(errors), "\n")
@@ -208,9 +217,10 @@ def KNN_alg(dataset, features, K):
 def main():
     np.random.seed(123456)
     data = hepatitis_data()
+    #hep_stats(data)
     features = ['Bilirubin', 'Albumin', 'Protime']
-    for K in range(5, 21, 5):
-        KNN_alg(data, features, K)
+    for K in range(2, 10, 2):
+        KNN_alg(data, features, K, L_fold=8)
 
 if __name__ == "__main__":
     main()
