@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import random
 
 from KNN import KNN
 
@@ -150,6 +149,7 @@ def hep_stats(dataset):
     plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
     # plt.show()
 
+    # get correlation matrix
     print(dataset[dataset.columns].corr()['Class'][:].sort_values())
 
 def messidor_data():
@@ -163,64 +163,119 @@ def messidor_data():
     # the messidor dataset does not have any missing values
     # the dataset does have a feature representing the quality of the image
     # delete 4 rows with bad quality, i.e. Quality==0
-    messidor_df.drop(messidor_df.loc[messidor_df["Quality"] == 0])
+    messidor_df = messidor_df.drop(messidor_df.loc[messidor_df["Quality"] == 0].index)
 
     # might need more cleaning up based on data values
 
-def KNN_alg(dataset, features, K, L_fold):
-    # randomize the data
-    random_data = dataset.sample(frac=1)
+    return messidor_df
 
-    # predicting Class (Live or Die) based on important features
-    x, y = random_data[features], random_data[['Class']]
+def messidor_stats(dataset):
+    # first 5 rows of the data and description
+    print(dataset.head().to_string(), "\n")
+    print(dataset.describe(include='all').to_string())
 
-    # create train and test data for predicting class based on Age
-    (N, D), C = x.shape, y['Class'].max()
-    print("instances (N) \t ", N, "\n features (D) \t ", D, "\n classes (C) \t ", C)
+    # get correlation matrix
+    print(dataset[dataset.columns].corr()['Class'][:].sort_values())
 
-    # implementing L-fold cross-validation and getting all errors
-    errors = []
-    # splitting the dataset into L chunks
-    fold_size = int(dataset.shape[0]/L_fold)
-    train_fold, test_fold = [], []
+    # seems like all features are not very correlated with Class
+    # but here are boxplots for the most coreelated features
+    # MA Detection 0.5
+    dataset.boxplot(column='Protime', by='Class')
+    plt.title('Distribution of Protime for every Class')
+    plt.suptitle('')
+    plt.ylabel('Protime')
+    plt.xlabel('')
+    plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
+    # plt.show()
+
+# predicting Class (Live or Die) based on important features using cross validation
+def KNN_cross_validation(dataset, train, features, K, L_fold):
+    # split the class from the features
+    x_train, y_train = train[features], train[['Class']]
+
+    # implementing L-fold cross-validation on train data
+    acc = []
+    # splitting the training dataset into L chunks
+    fold_size = int(train.shape[0]/L_fold)
+    x_fold, y_fold = [], []
     for i in range(0, dataset.shape[0], fold_size):
-        train_fold.append(x[i:(i+fold_size)])
-        test_fold.append(y[i:(i+fold_size)])
-    # the folds are created, iterate through and change test set
+        x_fold.append(x_train[i:(i+fold_size)])
+        y_fold.append(y_train[i:(i+fold_size)])
+    # the folds are created, iterate through and change validation set
     for i in range(L_fold):
         # need to concat the L-1 training chunks for x (feature values) and y (class)
         x_chunk, y_chunk = [], []
-        x_chunk.append(train_fold[:i] + train_fold[(i+1):])
-        y_chunk.append(test_fold[:i] + test_fold[(i+1):])
+        x_chunk.append(x_fold[:i] + x_fold[(i+1):])
+        y_chunk.append(y_fold[:i] + y_fold[(i+1):])
 
-        # choose training and test sets
-        x_train, y_train = pd.concat(x_chunk[0]), pd.concat(y_chunk[0])
-        x_test, y_test = train_fold[i], test_fold[i]
+        # training and validation sets concatenated into dataframes
+        train_x, train_y = pd.concat(x_chunk[0]), pd.concat(y_chunk[0])
+        validation_x, validation_y = x_fold[i], y_fold[i]
 
         # fitting the model
         model = KNN(K=K)
-        model.fit(x_train, y_train)
-        y_prob, knns = model.predict(x_test)
+        model.fit(train_x, train_y)
+        validation_prob, validation_knns = model.predict(validation_x)
 
         # choose class that has the max probability
-        # adding one since Class has 1 and 2 as values
-        y_pred = np.argmax(y_prob, axis=-1)
+        validation_pred = np.argmax(validation_prob, axis=-1)
         # y_test is a dataframe, convert it to a numpy array and calculate accuracy
-        acc = model.evaluate_acc(y_pred, y_test['Class'].to_numpy())
-        errors.append(acc)
+        error = 1-model.evaluate_acc(validation_pred, validation_y['Class'].to_numpy())
+        acc.append(1-error)
 
     print("\nKNN for K = ", K, " on given dataset")
-    print("Errors from cross validation: ", errors)
-    print("Mean of errors: ", np.mean(errors))
-    print("Variance of errors: ", np.var(errors), "\n")
+    print("Accuracies from cross validation: ", acc)
+    print("Mean of accuracies: ", np.mean(acc))
+    print("Variance of accuracies: ", np.var(acc))
+
+def KNN_alg(dataset, train, test, features, K):
+    # fit the model and calculate accuracy on unseen/test data
+    model = KNN(K=K)
+    model.fit(train[features], train[['Class']])
+    prob, knns = model.predict(test[features])
+
+    # choose class that has the max probability
+    predictions = np.argmax(prob, axis=-1)
+    accuracy = model.evaluate_acc(predictions, test['Class'].to_numpy())
+
+    print("\nModel accuracy: ", accuracy)
 
 def main():
     np.random.seed(123456)
-    data = hepatitis_data()
-    #hep_stats(data)
-    features = ['Bilirubin', 'Albumin', 'Protime']
-    for K in range(2, 10, 2):
-        KNN_alg(data, features, K, L_fold=8)
+
+    #data = hepatitis_data()
+    # randomize the data
+    #data = data.sample(frac=1)
+
+    # less noisy features
+    #features = ['Alk_Phosphate']
+    # info on training and test set
+    #x, y = data[features], data[['Class']]
+    #(N, D), C = x.shape, y['Class'].max()+1
+    #print("instances (N) \t ", N, "\n features (D) \t ", D, " ", features, "\n classes (C) \t ", C)
+    # split the data into train and test
+    #train, test = data[:60], data[60:]
+    #L = 3
+    #for K in range(5, 16, 1):
+        #KNN_cross_validation(data, train, features, K, L)
+
+    # optimal K found, find accuracy on test set
+    #K = 10
+    #KNN_alg(data, train, test, features, K)
+
+    # seems like only exudates has 0 values, why?
+    data = messidor_data()
+    data = data.sample(frac=1)
+    features = ['MA_Detection_0.5', 'MA_Detection_0.6']
+    # info on training and test set
+    x, y = data[features], data[['Class']]
+    (N, D), C = x.shape, y['Class'].max() + 1
+    print("instances (N) \t ", N, "\n features (D) \t ", D, " ", features, "\n classes (C) \t ", C)
+    # split the data into train and test
+    train, test = data[:1000], data[1000:]
+    L = 10
+    for K in range(5, 16, 1):
+        KNN_cross_validation(data, train, features, K, L)
 
 if __name__ == "__main__":
     main()
