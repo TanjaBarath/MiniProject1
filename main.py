@@ -303,19 +303,24 @@ def DT_hyperparameter_tuning(dataset, train, features, L_fold):
     return best_parameters, best_accuracy
 
 def main():
-    np.random.seed(123456)
+    np.random.seed(1234)
 
+    #decision_boundary()
+
+    #data = hepatitis_data()
     #data = messidor_data()
     # randomize the data
     #data = data.sample(frac=1)
+    #data = data.sample(frac=1)
 
+    #features = ['Albumin', 'Protime']
     #features = ['MA_Detection_0.5', 'MA_Detection_0.6', 'MA_Detection_0.7', 'MA_Detection_0.8', 'Exudates_0.99']
     # info on training and test set
     #x, y = data[features], data[['Class']]
     #(N, D), C = x.shape, y['Class'].max()+1
     #print("instances (N) \t ", N, "\n features (D) \t ", D, " ", features, "\n classes (C) \t ", C)
     # split the data into train and test
-    #train, test = data[:1000], data[1000:]
+    #train, test = data[:60], data[60:]
     #noise = [.01, .1, 1, 10, 100, 1000]
     #K = 40
     #L = 10
@@ -347,6 +352,114 @@ def main():
     #plt.ylabel('Accuracy')
     #plt.show()
 
+def decision_boundary():
+    messidor_df = messidor_data()
+    hep_df = hepatitis_data()
+
+    hep_df.loc[:, 'Protime'] = hep_df['Protime'].apply(lambda x: x/10)
+
+    # Hepatitis Data visualization
+    f1, f2 = 'Albumin', 'Protime'  # change features to see the layout
+    x1, y1 = hep_df[[f1, f2]], hep_df['Class']
+    x1_train, y1_train = x1.iloc[:60], y1.iloc[:60]
+    x1_test, y1_test = x1.iloc[60:], y1.iloc[60:]
+
+    # Visualization of the data
+    plt.scatter(x1_train.iloc[:, 0], x1_train.iloc[:, 1], c=y1_train, marker='o', label='train')
+    plt.scatter(x1_test.iloc[:, 0], x1_test.iloc[:, 1], c=y1_test, marker='s', label='test')
+    plt.legend()
+    plt.xlabel(f1)
+    plt.ylabel(f2)
+    plt.show()
+
+    # Messidor Data visualization
+    f3, f4 = 'Exudates_0.99', 'MA_Detection_0.5'  # change features to see the layout
+    x2, y2 = messidor_df[[f3, f4]], messidor_df['Class']
+    x2_train, y2_train = x2.iloc[:1000], y2.iloc[:1000]
+    x2_test, y2_test = x2.iloc[1000:], y2.iloc[1000:]
+
+    plt.scatter(x2_train.iloc[:, 0], x2_train.iloc[:, 1], c=y2_train, marker='o', label='train')
+    plt.scatter(x2_test.iloc[:, 0], x2_test.iloc[:, 1], c=y2_test, marker='s', label='test')
+    plt.legend()
+    plt.xlabel(f3)
+    plt.ylabel(f4)
+    plt.show()
+
+    # Decision Boundary for two most highly correlated features
+    # Hepatitis Data
+    data = hep_df.sample(frac=1) # randomize
+    features = ['Albumin', 'Protime']
+    x, y = data[features], data[['Class']]
+    (N, D), C = x.shape, y['Class'].max() + 1
+
+    # split the dataset into train and test
+    x_train, y_train = x[:60], y[:60]
+    x_test, y_test = x[60:], y[60:]
+
+    x0v = np.linspace(np.min(x.iloc[:, 0]), np.max(x.iloc[:, 0]), 200)
+    x1v = np.linspace(np.min(x.iloc[:, 1]), np.max(x.iloc[:, 1]), 200)
+
+    # to features values as a mesh
+    x0, x1 = np.meshgrid(x0v, x1v)
+    x_all = np.vstack((x0.ravel(), x1.ravel())).T
+    x_all = pd.DataFrame(x_all)
+
+    model = KNN(K=12)
+    model.fit(x_train, y_train)
+
+    y_train_prob = np.zeros((y_train.shape[0], 3))
+    y_train_prob[np.arange(y_train.shape[0]), y_train] = 1
+
+    # to get class probability of all the points in the 2D grid
+    y_prob_all, _ = model.predict(x_all)
+
+    y_pred_all = np.zeros_like(y_prob_all)
+    y_pred_all[np.arange(x_all.shape[0]), np.argmax(y_prob_all, axis=-1)] = 1
+    z = np.zeros((40000, 1))
+    y_pred_all = np.append(y_pred_all, z, axis=1)
+
+    plt.scatter(x_train[features[0]], x_train[features[1]], c=y_train_prob, marker='o', alpha=1)
+    plt.scatter(x_all.iloc[:, 0], x_all.iloc[:, 1], c=y_pred_all, marker='.', alpha=0.01)
+    plt.title('Decision Boundary for Albumin and Protime with K=12')
+    plt.xlabel('Albumin')
+    plt.ylabel('Protime')
+    plt.show()
+
+    # Decision Boundary for two most highly correlated features in messidor dataset
+    data = messidor_df.sample(frac=1)
+    features = ['Exudates_0.99', 'MA_Detection_0.5']
+    x, y = data[features], data[['Class']]
+    (N, D), C = x.shape, y['Class'].max() + 1
+    train, test = data[:1000], data[1000:]
+
+    x0v = np.linspace(np.min(train[features[0]]), np.max(train[features[0]]), 200)
+    x1v = np.linspace(np.min(train[features[1]]), np.max(train[features[1]]), 200)
+
+    # to features values as a mesh
+    x0, x1 = np.meshgrid(x0v, x1v)
+    x_all = np.vstack((x0.ravel(), x1.ravel())).T
+    x_all = pd.DataFrame(x_all)
+
+    model = KNN(K=40)
+    model.fit(train[features], train[['Class']])
+    # y_prob, knns = model.predict(test[features])
+    # y_pred = np.argmax(y_prob, axis=-1)
+    y_train_prob = np.zeros((train[['Class']].shape[0], C+1))
+    y_train_prob[np.arange(train[['Class']].shape[0]), train[['Class']]] = 1
+
+    # to get class probability of all the points in the 2D grid
+    y_prob_all, _ = model.predict(x_all)
+    y_prob_all_draw = np.zeros((y_prob_all.shape[0], C+1))
+
+    for i in range(y_prob_all.shape[0]):
+        y_prob_all_draw[i, 0:2] = y_prob_all[i, 0:2]
+
+    plt.scatter(train[features[0]], train[features[1]], c=y_train_prob, marker='o', alpha=1)
+    plt.scatter(x_all.iloc[:, 0], x_all.iloc[:, 1], c=y_prob_all_draw, marker='.', alpha=0.01)
+    plt.title('Decision Boundary for Exudates 0.99 and MA Detection 0.5 with K=40')
+    plt.xlabel('Exudates 0.99')
+    plt.ylabel('MA Detection 0.5')
+    plt.show()
 
 if __name__ == "__main__":
     main()
