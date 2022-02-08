@@ -1,8 +1,12 @@
+from itertools import combinations
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from KNN import KNN
+from decision_tree import decision_tree
+
 
 def hepatitis_data():
     hep_names = ["Class", "Age", "Sex", "Steroid", "Antivirals", "Fatigue", "Malaise", "Anorexia",
@@ -172,21 +176,31 @@ def messidor_data():
 def messidor_stats(dataset):
     # first 5 rows of the data and description
     print(dataset.head().to_string(), "\n")
-    print(dataset.describe(include='all').to_string())
+    data = dataset.groupby('Class')
+    print(data.describe(include='all').to_string())
 
     # get correlation matrix
     print(dataset[dataset.columns].corr()['Class'][:].sort_values())
 
     # seems like all features are not very correlated with Class
-    # but here are boxplots for the most coreelated features
-    # MA Detection 0.5
-    dataset.boxplot(column='Protime', by='Class')
-    plt.title('Distribution of Protime for every Class')
+    # but here are boxplots for the most correlated features
+    # MA Detection 0.5, MA Detection 0.6, MA Detection 0.7, MA Detection 0.8, Exudates 0.99
+    df = pd.DataFrame(data = dataset[['Class', 'MA_Detection_0.5', 'MA_Detection_0.6', 'MA_Detection_0.7', 'MA_Detection_0.8', 'Exudates_0.99']],
+                      columns = ['Class', 'MA_Detection_0.5', 'MA_Detection_0.6', 'MA_Detection_0.7', 'MA_Detection_0.8', 'Exudates_0.99'])
+    df.loc[:, 'Exudates_0.99'] = df['Exudates_0.99'].apply(lambda x: x * 10)
+    df = pd.melt(df, id_vars=['Class'], value_vars = ['MA_Detection_0.5', 'MA_Detection_0.6', 'MA_Detection_0.7', 'MA_Detection_0.8', 'Exudates_0.99'], var_name = 'Feature', value_name = 'Value')
+    sns.set_theme(style="ticks", palette="pastel")
+    plot = sns.boxplot(x='Feature', y='Value', hue='Class', palette=["m","g"], data = df)
+    plt.xticks(rotation=45)
     plt.suptitle('')
-    plt.ylabel('Protime')
-    plt.xlabel('')
-    plt.xticks(np.arange(4), ['', 'Die', 'Live', ''])
-    # plt.show()
+    plot.legend(title = 'Class')
+    legend_labels = ['No DR', 'DR']
+    n = 0
+    for i in legend_labels:
+        plot.legend_.texts[n].set_text(i)
+        n += 1
+    plt.tight_layout()
+    plt.show()
 
 # predicting Class (Live or Die) based on important features using cross validation
 def KNN_cross_validation(dataset, train, features, K, L_fold):
@@ -220,62 +234,119 @@ def KNN_cross_validation(dataset, train, features, K, L_fold):
         # choose class that has the max probability
         validation_pred = np.argmax(validation_prob, axis=-1)
         # y_test is a dataframe, convert it to a numpy array and calculate accuracy
-        error = 1-model.evaluate_acc(validation_pred, validation_y['Class'].to_numpy())
-        acc.append(1-error)
+        accuracy = model.evaluate_acc(validation_pred, validation_y['Class'].to_numpy())
+        acc.append(accuracy)
 
-    print("\nKNN for K = ", K, " on given dataset")
-    print("Accuracies from cross validation: ", acc)
-    print("Mean of accuracies: ", np.mean(acc))
-    print("Variance of accuracies: ", np.var(acc))
+    mean = round(np.mean(acc),5)
+    var = round(np.var(acc),5)
 
-def KNN_alg(dataset, train, test, features, K):
-    # fit the model and calculate accuracy on unseen/test data
-    model = KNN(K=K)
-    model.fit(train[features], train[['Class']])
-    prob, knns = model.predict(test[features])
+    #print("\nKNN for K = ", K, " on given dataset")
+    #print("Accuracies from cross validation: ", acc)
+    #print("Mean of accuracies: ", mean)
+    #print("Variance of accuracies: ", var)
 
-    # choose class that has the max probability
-    predictions = np.argmax(prob, axis=-1)
-    accuracy = model.evaluate_acc(predictions, test['Class'].to_numpy())
+    return mean, var
 
-    print("\nModel accuracy: ", accuracy)
+def DT_hyperparameter_tuning(dataset, train, features, L_fold):
+    # split the class from the features
+    x_train, y_train = train[features], train[['Class']]
+    best_accuracy = 0.
+    best_parameters = ""
+
+    for combination in range(len(combinations)):
+        print(combinations[combination])
+        # implementing L-fold cross-validation on train data
+        acc = []
+        # splitting the training dataset into L chunks
+        fold_size = int(train.shape[0] / L_fold)
+        x_fold, y_fold = [], []
+
+        for i in range(0, dataset.shape[0], fold_size):
+            x_fold.append(x_train[i:(i + fold_size)])
+            y_fold.append(y_train[i:(i + fold_size)])
+        # the folds are created, iterate through and change validation set
+
+        for i in range(L_fold):
+            # need to concat the L-1 training chunks for x (feature values) and y (class)
+            x_chunk, y_chunk = [], []
+            x_chunk.append(x_fold[:i] + x_fold[(i + 1):])
+            y_chunk.append(y_fold[:i] + y_fold[(i + 1):])
+
+            # training and validation sets concatenated into dataframes
+            train_x, train_y = pd.concat(x_chunk[0]), pd.concat(y_chunk[0])
+            validation_x, validation_y = x_fold[i], y_fold[i]
+
+            # fitting the model
+            tree = decision_tree(max_depth=combinations[combination]['max_depth'],
+                                cost_fn=combinations[combination]['cost_fn'],
+                                min_leaf_instances=combinations[combination]['min_leaf_instances'])
+            # tree = DecisionTree(max_depth=combinations[combination]['max_depth'])
+            # tree = DecisionTree(cost_fn=combinations[combination]['cost_fn'])
+            tree = decision_tree(min_leaf_instances=combinations[combination]['min_leaf_instances'])
+            probs_test = tree.fit(x_train.to_numpy(), y_train.values.flatten()).predict(validation_x.to_numpy())
+            y_pred = np.argmax(probs_test, 1)
+            accuracy = tree.evaluate_acc(y_pred, validation_y.values.flatten())
+            acc.append(accuracy)
+
+        mean_accuracy = np.mean(acc)
+        variance_accuracy = np.var(acc)
+        print("Mean of accuracies: ", round(np.mean(acc), 2))
+        # print("Variance of accuracies: ", round(np.var(acc), 2))
+
+        if mean_accuracy > best_accuracy:
+            best_accuracy = mean_accuracy
+            best_parameters = combinations[combination]
+
+    print("Best accuracy: ", round(best_accuracy, 2))
+    print("Best parameters: ", best_parameters)
+
+    return best_parameters, best_accuracy
 
 def main():
     np.random.seed(123456)
 
-    #data = hepatitis_data()
+    #data = messidor_data()
     # randomize the data
     #data = data.sample(frac=1)
 
-    # less noisy features
-    #features = ['Alk_Phosphate']
+    #features = ['MA_Detection_0.5', 'MA_Detection_0.6', 'MA_Detection_0.7', 'MA_Detection_0.8', 'Exudates_0.99']
     # info on training and test set
     #x, y = data[features], data[['Class']]
     #(N, D), C = x.shape, y['Class'].max()+1
     #print("instances (N) \t ", N, "\n features (D) \t ", D, " ", features, "\n classes (C) \t ", C)
     # split the data into train and test
-    #train, test = data[:60], data[60:]
-    #L = 3
-    #for K in range(5, 16, 1):
-        #KNN_cross_validation(data, train, features, K, L)
+    #train, test = data[:1000], data[1000:]
+    #noise = [.01, .1, 1, 10, 100, 1000]
+    #K = 40
+    #L = 10
+    #means, variances, test_acc, K_list = [], [], [], []
+    #for i in range(len(noise)):#K in range(40, 41, 1):
+        #K_list.append(noise[i])
+        #data.loc[:, 'Exudates_0.99'] = data['Exudates_0.99'].apply(lambda x: x*noise[i])
+        #mean, var = KNN_cross_validation(data, train, features, K, L)
+        #means.append(mean)
+        #variances.append(var)
 
-    # optimal K found, find accuracy on test set
-    #K = 10
-    #KNN_alg(data, train, test, features, K)
+        # fit the model and calculate accuracy on unseen/test data
+        #model = KNN(K=K)
+        #model.fit(train[features], train[['Class']])
+        #prob, knns = model.predict(test[features])
 
-    # seems like only exudates has 0 values, why?
-    data = messidor_data()
-    data = data.sample(frac=1)
-    features = ['MA_Detection_0.5', 'MA_Detection_0.6']
-    # info on training and test set
-    x, y = data[features], data[['Class']]
-    (N, D), C = x.shape, y['Class'].max() + 1
-    print("instances (N) \t ", N, "\n features (D) \t ", D, " ", features, "\n classes (C) \t ", C)
-    # split the data into train and test
-    train, test = data[:1000], data[1000:]
-    L = 10
-    for K in range(5, 16, 1):
-        KNN_cross_validation(data, train, features, K, L)
+        # choose class that has the max probability
+        #predictions = np.argmax(prob, axis=-1)
+        #accuracy = model.evaluate_acc(predictions, test['Class'].to_numpy())
+        #test_acc.append(accuracy)
+        # put it back
+        #data.loc[:, 'Exudates_0.99'] = data['Exudates_0.99'].apply(lambda x: x/noise[i])
+
+    #plt.errorbar(K_list, means, variances, label='validation')
+    #plt.plot(K_list, test_acc, label='test')
+    #plt.legend()
+    #plt.title('Accuracies with 10-fold CV, euclidean distance and K=40')
+    #plt.xlabel('Scale of noisy feature')
+    #plt.ylabel('Accuracy')
+    #plt.show()
+
 
 if __name__ == "__main__":
     main()

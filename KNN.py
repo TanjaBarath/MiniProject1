@@ -5,7 +5,6 @@ import matplotlib as plt
 euclidean = lambda x1, x2: np.sqrt(np.sum((x1 - x2)**2, axis=-1))
 manhattan = lambda x1, x2: np.sum(np.abs(x1 - x2), axis=-1)
 chebyshev = lambda x1, x2: np.max(np.abs(x1 - x2))
-minkowski = lambda x1, x2, p: np.sum(np.abs(x1 - x2)**p, axis=-1)**(1/p)
 cosine = lambda x1, x2: (np.transpose(x1) * x2)/(np.linalg.norm(x1) * np.linalg.norm(x2))
 # discrete feature vectors
 hamming = lambda x1, x2: np.count_nonzero(x1 != x2)
