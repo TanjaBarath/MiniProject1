@@ -302,56 +302,6 @@ def DT_hyperparameter_tuning(dataset, train, features, L_fold):
 
     return best_parameters, best_accuracy
 
-def main():
-    np.random.seed(1234)
-
-    #decision_boundary()
-
-    #data = hepatitis_data()
-    #data = messidor_data()
-    # randomize the data
-    #data = data.sample(frac=1)
-    #data = data.sample(frac=1)
-
-    #features = ['Albumin', 'Protime']
-    #features = ['MA_Detection_0.5', 'MA_Detection_0.6', 'MA_Detection_0.7', 'MA_Detection_0.8', 'Exudates_0.99']
-    # info on training and test set
-    #x, y = data[features], data[['Class']]
-    #(N, D), C = x.shape, y['Class'].max()+1
-    #print("instances (N) \t ", N, "\n features (D) \t ", D, " ", features, "\n classes (C) \t ", C)
-    # split the data into train and test
-    #train, test = data[:60], data[60:]
-    #noise = [.01, .1, 1, 10, 100, 1000]
-    #K = 40
-    #L = 10
-    #means, variances, test_acc, K_list = [], [], [], []
-    #for i in range(len(noise)):#K in range(40, 41, 1):
-        #K_list.append(noise[i])
-        #data.loc[:, 'Exudates_0.99'] = data['Exudates_0.99'].apply(lambda x: x*noise[i])
-        #mean, var = KNN_cross_validation(data, train, features, K, L)
-        #means.append(mean)
-        #variances.append(var)
-
-        # fit the model and calculate accuracy on unseen/test data
-        #model = KNN(K=K)
-        #model.fit(train[features], train[['Class']])
-        #prob, knns = model.predict(test[features])
-
-        # choose class that has the max probability
-        #predictions = np.argmax(prob, axis=-1)
-        #accuracy = model.evaluate_acc(predictions, test['Class'].to_numpy())
-        #test_acc.append(accuracy)
-        # put it back
-        #data.loc[:, 'Exudates_0.99'] = data['Exudates_0.99'].apply(lambda x: x/noise[i])
-
-    #plt.errorbar(K_list, means, variances, label='validation')
-    #plt.plot(K_list, test_acc, label='test')
-    #plt.legend()
-    #plt.title('Accuracies with 10-fold CV, euclidean distance and K=40')
-    #plt.xlabel('Scale of noisy feature')
-    #plt.ylabel('Accuracy')
-    #plt.show()
-
 def decision_boundary():
     messidor_df = messidor_data()
     hep_df = hepatitis_data()
@@ -373,7 +323,7 @@ def decision_boundary():
     plt.show()
 
     # Messidor Data visualization
-    f3, f4 = 'Exudates_0.99', 'MA_Detection_0.5'  # change features to see the layout
+    f3, f4 = 'MA_Detection_0.8', 'MA_Detection_0.5'  # change features to see the layout
     x2, y2 = messidor_df[[f3, f4]], messidor_df['Class']
     x2_train, y2_train = x2.iloc[:1000], y2.iloc[:1000]
     x2_test, y2_test = x2.iloc[1000:], y2.iloc[1000:]
@@ -425,9 +375,44 @@ def decision_boundary():
     plt.ylabel('Protime')
     plt.show()
 
+    # Hepatitis Data -Decision Tree
+    data = hep_df.sample(frac=1)
+    features = ['Albumin', 'Protime']
+    x, y = data[features], data[['Class']]
+    (N, D), C = x.shape, y['Class'].max() + 1
+
+    inds = np.random.permutation(N)
+    x_train, y_train = x.iloc[inds[:60]].to_numpy(), y.iloc[inds[:60]].values.flatten()
+    x_test, y_test = x.iloc[inds[60:]].to_numpy(), y.iloc[inds[60:]].values.flatten()
+
+    x0v = np.linspace(np.min(x.iloc[:, 0]), np.max(x.iloc[:, 0]), 200)
+    x1v = np.linspace(np.min(x.iloc[:, 1]), np.max(x.iloc[:, 1]), 200)
+
+    # to features values as a mesh
+    x0, x1 = np.meshgrid(x0v, x1v)
+    x_all = np.vstack((x0.ravel(), x1.ravel())).T
+    # x_all = pd.DataFrame(x_all)
+
+    model = decision_tree(max_depth=200)
+    y_train_prob = np.zeros((y_train.shape[0], 3))
+    y_train_prob[np.arange(y_train_prob.shape[0]), y_train] = 1
+    y_prob_all = model.fit(x_train, y_train).predict(x_all)
+    y_prob_all_draw = np.zeros((y_prob_all.shape[0], C + 1))
+
+    for i in range(y_prob_all.shape[0]):
+        y_prob_all_draw[i, 0:2] = y_prob_all[i, 0:2]
+
+    # to plot
+    plt.scatter(x_train[:, 0], x_train[:, 1], c=y_train_prob, marker='o', alpha=1)
+    plt.scatter(x_all[:, 0], x_all[:, 1], c=y_prob_all_draw, marker='.', alpha=0.01)
+    plt.title('Decision Boundary for Albumin and Protime with Decision Tree')
+    plt.xlabel('Albumin')
+    plt.ylabel('Protime')
+    plt.show()
+
     # Decision Boundary for two most highly correlated features in messidor dataset
     data = messidor_df.sample(frac=1)
-    features = ['Exudates_0.99', 'MA_Detection_0.5']
+    features = ['MA_Detection_0.8', 'MA_Detection_0.5']
     x, y = data[features], data[['Class']]
     (N, D), C = x.shape, y['Class'].max() + 1
     train, test = data[:1000], data[1000:]
@@ -456,9 +441,59 @@ def decision_boundary():
 
     plt.scatter(train[features[0]], train[features[1]], c=y_train_prob, marker='o', alpha=1)
     plt.scatter(x_all.iloc[:, 0], x_all.iloc[:, 1], c=y_prob_all_draw, marker='.', alpha=0.01)
-    plt.title('Decision Boundary for Exudates 0.99 and MA Detection 0.5 with K=40')
-    plt.xlabel('Exudates 0.99')
+    plt.title('Decision Boundary for MA Detection 0.8 and MA Detection 0.5 with K=40')
+    plt.xlabel('MA Detection 0.8')
     plt.ylabel('MA Detection 0.5')
+    plt.show()
+
+def main():
+    np.random.seed(123456)
+
+    decision_boundary()
+
+    data = hepatitis_data()
+    data = messidor_data()
+    # randomize the data
+    data = data.sample(frac=1)
+    data = data.sample(frac=1)
+
+    features = ['Albumin', 'Protime']
+    features = ['MA_Detection_0.5', 'MA_Detection_0.6', 'MA_Detection_0.7', 'MA_Detection_0.8', 'Exudates_0.99']
+    # info on training and test set
+    x, y = data[features], data[['Class']]
+    (N, D), C = x.shape, y['Class'].max()+1
+    print("instances (N) \t ", N, "\n features (D) \t ", D, " ", features, "\n classes (C) \t ", C)
+    # split the data into train and test
+    train, test = data[:60], data[60:]
+    noise = [.01, .1, 1, 10, 100, 1000]
+    K = 40
+    L = 10
+    means, variances, test_acc, K_list = [], [], [], []
+    for i in range(len(noise)):#K in range(40, 41, 1):
+        K_list.append(noise[i])
+        data.loc[:, 'Exudates_0.99'] = data['Exudates_0.99'].apply(lambda x: x*noise[i])
+        mean, var = KNN_cross_validation(data, train, features, K, L)
+        means.append(mean)
+        variances.append(var)
+
+        # fit the model and calculate accuracy on unseen/test data
+        model = KNN(K=K)
+        model.fit(train[features], train[['Class']])
+        prob, knns = model.predict(test[features])
+
+        # choose class that has the max probability
+        predictions = np.argmax(prob, axis=-1)
+        accuracy = model.evaluate_acc(predictions, test['Class'].to_numpy())
+        test_acc.append(accuracy)
+        # put it back
+        data.loc[:, 'Exudates_0.99'] = data['Exudates_0.99'].apply(lambda x: x/noise[i])
+
+    plt.errorbar(K_list, means, variances, label='validation')
+    plt.plot(K_list, test_acc, label='test')
+    plt.legend()
+    plt.title('Accuracies with 10-fold CV, euclidean distance and K=40')
+    plt.xlabel('Scale of noisy feature')
+    plt.ylabel('Accuracy')
     plt.show()
 
 if __name__ == "__main__":

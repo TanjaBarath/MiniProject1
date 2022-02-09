@@ -25,17 +25,51 @@ class decision_tree:
         # you could compress both the steps above by doing class_probs = np.bincount(labels) / len(labels)
         return 1 - np.max(class_probs)
 
-    # computes entropy of the labels by computing the class probabilities
+        # computes entropy of the labels by computing the class probabilities
+
     def cost_entropy(labels):
         class_probs = np.bincount(labels) / len(labels)
         class_probs = class_probs[
             class_probs > 0]  # this steps is remove 0 probabilities for removing numerical issues while computing log
         return -np.sum(class_probs * np.log(class_probs))  # expression for entropy -\sigma p(x)log[p(x)]
 
-    # computes the gini index cost
+        # computes the gini index cost
+
     def cost_gini_index(labels):
         class_probs = np.bincount(labels) / len(labels)
         return 1 - np.sum(np.square(class_probs))  # expression for gini index 1-\sigma p(x)^2
+
+    def greedy_test(node, cost_fn):
+        # initialize the best parameter values
+        best_cost = np.inf
+        best_feature, best_value = None, None
+        num_instances, num_features = node.data.shape
+        # sort the features to get the test value candidates by taking the average of consecutive sorted feature values
+        data_sorted = np.sort(node.data[node.data_indices], axis=0)
+        test_candidates = (data_sorted[1:] + data_sorted[:-1]) / 2.
+        for f in range(num_features):
+            # stores the data corresponding to the f-th feature
+            data_f = node.data[node.data_indices, f]
+            for test in test_candidates[:, f]:
+                # Split the indices using the test value of f-th feature
+                left_indices = node.data_indices[data_f <= test]
+                right_indices = node.data_indices[data_f > test]
+                # we can't have a split where a child has zero element
+                # if this is true over all the test features and their test values  then the function returns the best cost as infinity
+                if len(left_indices) == 0 or len(right_indices) == 0:
+                    continue
+                # compute the left and right cost based on the current split
+                left_cost = cost_fn(node.labels[left_indices])
+                right_cost = cost_fn(node.labels[right_indices])
+                num_left, num_right = left_indices.shape[0], right_indices.shape[0]
+                # get the combined cost using the weighted sum of left and right cost
+                cost = (num_left * left_cost + num_right * right_cost) / num_instances
+                # update only when a lower cost is encountered
+                if cost < best_cost:
+                    best_cost = cost
+                    best_feature = f
+                    best_value = test
+        return best_cost, best_feature, best_value
 
     def __init__(self, num_classes=None, max_depth=3, cost_fn=cost_misclassification, min_leaf_instances=1):
         self.num_classes = num_classes  # number of classes in the tree
@@ -45,37 +79,9 @@ class decision_tree:
         # stores the total number of classes
         self.min_leaf_instances = min_leaf_instances  # minimum number of instances in a leaf for termination
 
-    def greedy_test(node, cost_fn):
-        #initialize the best parameter values
-        best_cost = np.inf
-        best_feature, best_value = None, None
-        num_instances, num_features = node.data.shape
-        #sort the features to get the test value candidates by taking the average of consecutive sorted feature values
-        data_sorted = np.sort(node.data[node.data_indices],axis=0)
-        test_candidates = (data_sorted[1:] + data_sorted[:-1]) / 2.
-        for f in range(num_features):
-            #stores the data corresponding to the f-th feature
-            data_f = node.data[node.data_indices, f]
-            for test in test_candidates[:,f]:
-                #Split the indices using the test value of f-th feature
-                left_indices = node.data_indices[data_f <= test]
-                right_indices = node.data_indices[data_f > test]
-                #we can't have a split where a child has zero element
-                #if this is true over all the test features and their test values  then the function returns the best cost as infinity
-                if len(left_indices) == 0 or len(right_indices) == 0:
-                    continue
-                #compute the left and right cost based on the current split
-                left_cost = cost_fn(node.labels[left_indices])
-                right_cost = cost_fn(node.labels[right_indices])
-                num_left, num_right = left_indices.shape[0], right_indices.shape[0]
-                #get the combined cost using the weighted sum of left and right cost
-                cost = (num_left * left_cost + num_right * right_cost)/num_instances
-                #update only when a lower cost is encountered
-                if cost < best_cost:
-                    best_cost = cost
-                    best_feature = f
-                    best_value = test
-        return best_cost, best_feature, best_value
+    def get_params(self, deep=False):
+        return {'num_classes': self.num_classes, 'max_depth': self.max_depth, 'cost_fn': self.cost_fn,
+                'min_leaf_instances': self.min_leaf_instances}
 
     def fit(self, data, labels):
         self.data = data
@@ -134,8 +140,3 @@ class decision_tree:
     def evaluate_acc(self, y_pred, y_test):
         accuracy = np.sum(y_pred == y_test) / y_test.shape[0]
         return accuracy
-
-    def get_params(self, deep=False):
-        return {'num_classes': self.num_classes, 'max_depth': self.max_depth, 'cost_fn': self.cost_fn,
-                'min_leaf_instances': self.min_leaf_instances}
-
